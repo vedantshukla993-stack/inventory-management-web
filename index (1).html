@@ -1,0 +1,1279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tent House Inventory Management System</title>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getFirestore, collection, doc, addDoc, updateDoc, deleteDoc,
+  onSnapshot, query, orderBy, writeBatch, getDocs, setDoc
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+/* ============== FIREBASE CONFIG — REPLACE WITH YOUR PROJECT CONFIG ============== */
+const firebaseConfig = {
+  apiKey: "AIzaSyCK7fFq4m0csk1zV6nNiEtPTefMLcC_KHw",
+  authDomain: "inventory-management-4aadb.firebaseapp.com",
+  projectId: "inventory-management-4aadb",
+  storageBucket: "inventory-management-4aadb.firebasestorage.app",
+  messagingSenderId: "49408519996",
+  appId: "1:49408519996:web:9f1b9bfa403c250be67839",
+  measurementId: "G-BNN1Z4S0K8"
+};
+
+const fbApp = initializeApp(firebaseConfig);
+const db = getFirestore(fbApp);
+
+window.__fb = {
+  db, collection, doc, addDoc, updateDoc, deleteDoc,
+  onSnapshot, query, orderBy, writeBatch, getDocs, setDoc
+};
+window.dispatchEvent(new Event('firebase-ready'));
+</script>
+<style>
+:root{
+  --bg:#f4f6fb; --sidebar:#1e2640; --sidebar-text:#cfd6ea; --card:#ffffff; --text:#1c2333;
+  --muted:#6b7280; --border:#e5e7eb; --accent:#4f6df5; --accent-dark:#3d56c9; --success:#16a34a;
+  --danger:#dc2626; --warning:#d97706; --info:#0891b2; --shadow:0 2px 8px rgba(0,0,0,0.06);
+}
+[data-theme="dark"]{
+  --bg:#11141f; --sidebar:#0c0e17; --sidebar-text:#aab2c8; --card:#181c2b; --text:#e7eaf3;
+  --muted:#8a91a8; --border:#2a2f42; --accent:#5b7bff; --accent-dark:#4862d6; --success:#22c55e;
+  --danger:#ef4444; --warning:#f59e0b; --info:#22b8cf; --shadow:0 2px 10px rgba(0,0,0,0.4);
+}
+*{box-sizing:border-box;}
+body{margin:0;font-family:'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg);color:var(--text);transition:background .2s,color .2s;}
+.app{display:flex;min-height:100vh;}
+.sidebar{width:230px;background:var(--sidebar);color:var(--sidebar-text);display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:100;transition:transform .25s;}
+.sidebar .brand{padding:20px 18px;font-size:18px;font-weight:700;color:#fff;border-bottom:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;gap:10px;}
+.sidebar nav{flex:1;padding:10px;overflow-y:auto;}
+.sidebar nav button{width:100%;text-align:left;background:none;border:none;color:var(--sidebar-text);padding:12px 14px;border-radius:8px;font-size:14.5px;cursor:pointer;display:flex;align-items:center;gap:10px;margin-bottom:4px;transition:background .15s;}
+.sidebar nav button:hover{background:rgba(255,255,255,0.07);}
+.sidebar nav button.active{background:var(--accent);color:#fff;}
+.sidebar .foot{padding:14px;border-top:1px solid rgba(255,255,255,0.08);font-size:11.5px;color:var(--muted);}
+.main{flex:1;margin-left:230px;display:flex;flex-direction:column;min-height:100vh;}
+.topbar{position:sticky;top:0;background:var(--card);border-bottom:1px solid var(--border);padding:14px 22px;display:flex;align-items:center;justify-content:space-between;z-index:50;box-shadow:var(--shadow);flex-wrap:wrap;gap:10px;}
+.topbar h1{font-size:19px;margin:0;}
+.topbar .actions{display:flex;gap:10px;align-items:center;}
+.icon-btn{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px 10px;cursor:pointer;color:var(--text);font-size:13px;}
+.menu-toggle{display:none;background:none;border:none;font-size:22px;color:var(--text);cursor:pointer;margin-right:10px;}
+.content{padding:22px;flex:1;}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px;box-shadow:var(--shadow);}
+.card .label{color:var(--muted);font-size:12.5px;margin-bottom:6px;}
+.card .value{font-size:24px;font-weight:700;}
+.card.accent-blue{border-left:4px solid var(--accent);}
+.card.accent-green{border-left:4px solid var(--success);}
+.card.accent-orange{border-left:4px solid var(--warning);}
+.card.accent-red{border-left:4px solid var(--danger);}
+.card.accent-purple{border-left:4px solid #9333ea;}
+.panel{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:20px;box-shadow:var(--shadow);}
+.panel h2{margin-top:0;font-size:16px;}
+.row{display:flex;flex-wrap:wrap;gap:12px;}
+.row > *{flex:1;min-width:180px;}
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:12px;}
+.field label{font-size:12.5px;color:var(--muted);}
+input,select,textarea{padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:14px;font-family:inherit;}
+textarea{resize:vertical;min-height:50px;}
+button.btn{background:var(--accent);color:#fff;border:none;padding:10px 16px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;transition:background .15s;}
+button.btn:hover{background:var(--accent-dark);}
+button.btn.secondary{background:var(--bg);color:var(--text);border:1px solid var(--border);}
+button.btn.danger{background:var(--danger);}
+button.btn.success{background:var(--success);}
+button.btn.warning{background:var(--warning);}
+button.btn.small{padding:6px 10px;font-size:12.5px;}
+button.btn:disabled{opacity:.5;cursor:not-allowed;}
+table{width:100%;border-collapse:collapse;font-size:13.5px;}
+th,td{padding:10px 8px;text-align:left;border-bottom:1px solid var(--border);}
+th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;}
+tr:hover td{background:rgba(127,127,127,0.04);}
+.table-wrap{overflow-x:auto;}
+.badge{padding:3px 9px;border-radius:20px;font-size:11.5px;font-weight:600;display:inline-block;}
+.badge.low{background:rgba(220,38,38,0.15);color:var(--danger);}
+.badge.ok{background:rgba(22,163,74,0.15);color:var(--success);}
+.badge.out{background:rgba(217,119,6,0.15);color:var(--warning);}
+.badge.damage{background:rgba(220,38,38,0.15);color:var(--danger);}
+.badge.lost{background:rgba(147,51,234,0.15);color:#9333ea;}
+.badge.paid{background:rgba(22,163,74,0.15);color:var(--success);}
+.badge.partial{background:rgba(217,119,6,0.15);color:var(--warning);}
+.badge.unpaid{background:rgba(220,38,38,0.15);color:var(--danger);}
+.toast-container{position:fixed;bottom:20px;right:20px;z-index:1000;display:flex;flex-direction:column;gap:10px;max-width:90vw;}
+.toast{background:var(--card);color:var(--text);border:1px solid var(--border);border-left:4px solid var(--accent);padding:12px 16px;border-radius:8px;box-shadow:var(--shadow);min-width:230px;font-size:13.5px;animation:slideIn .25s ease;}
+.toast.success{border-left-color:var(--success);}
+.toast.error{border-left-color:var(--danger);}
+.toast.warning{border-left-color:var(--warning);}
+@keyframes slideIn{from{transform:translateX(40px);opacity:0;}to{transform:translateX(0);opacity:1;}}
+.modal-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:2000;padding:16px;overflow-y:auto;}
+.modal{background:var(--card);border-radius:12px;padding:22px;max-width:460px;width:100%;box-shadow:var(--shadow);max-height:90vh;overflow-y:auto;}
+.modal h3{margin-top:0;}
+.modal .modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px;flex-wrap:wrap;}
+.empty-state{text-align:center;color:var(--muted);padding:30px;font-size:14px;}
+.search-bar{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;}
+.search-bar input,.search-bar select{flex:1;min-width:160px;}
+.item-select-row{display:flex;gap:10px;align-items:end;margin-bottom:10px;flex-wrap:wrap;}
+.item-select-row > *{flex:1;min-width:140px;}
+.item-select-row .stock-info{font-size:12px;color:var(--muted);min-width:80px;}
+.selected-items-list{margin-top:10px;}
+.selected-item-row{display:flex;gap:10px;align-items:center;padding:8px;background:var(--bg);border-radius:8px;margin-bottom:6px;flex-wrap:wrap;}
+.selected-item-row span{flex:1;min-width:100px;}
+.selected-item-row input{width:80px;}
+.tag-cat{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:2px 8px;font-size:11.5px;color:var(--muted);}
+.overlay-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:90;}
+@media (max-width:900px){
+  .sidebar{transform:translateX(-100%);}
+  .sidebar.open{transform:translateX(0);}
+  .main{margin-left:0;}
+  .menu-toggle{display:block;}
+  .overlay-bg.show{display:block;}
+}
+.section-title{font-size:13px;color:var(--muted);text-transform:uppercase;margin:14px 0 6px 14px;letter-spacing:.5px;}
+.conn-dot{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:6px;}
+.conn-dot.online{background:var(--success);}
+.conn-dot.offline{background:var(--danger);}
+.loader{display:flex;align-items:center;justify-content:center;padding:50px;color:var(--muted);font-size:14px;}
+.spinner{width:18px;height:18px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;margin-right:10px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+</style>
+</head>
+<body data-theme="light">
+<div class="overlay-bg" id="overlayBg"></div>
+<div class="app">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">🏕️ Tent House IMS</div>
+    <div class="section-title">Menu</div>
+    <nav id="navMenu">
+      <button data-page="dashboard" class="active">📊 Dashboard</button>
+      <button data-page="inventory">📦 Inventory</button>
+      <button data-page="issue">📤 Issue Items</button>
+      <button data-page="return">📥 Return Items</button>
+      <button data-page="damage">⚠️ Damage / Lost</button>
+      <button data-page="current">🕒 Current Out</button>
+      <button data-page="history">📜 History</button>
+      <button data-page="reports">📈 Reports</button>
+      <button data-page="data">💾 Data / Backup</button>
+    </nav>
+    <div class="foot"><span class="conn-dot offline" id="connDot"></span><span id="connText">Connecting to Firestore...</span></div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;">
+        <button class="menu-toggle" id="menuToggle">☰</button>
+        <h1 id="pageTitle">Dashboard</h1>
+      </div>
+      <div class="actions">
+        <button class="icon-btn" id="themeToggle">🌙 Dark</button>
+      </div>
+    </div>
+    <div class="content" id="content"><div class="loader"><div class="spinner"></div>Connecting to Firestore...</div></div>
+  </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+<div id="modalRoot"></div>
+
+<script>
+/* ===================== FIRESTORE LAYER ===================== */
+let fb = null;
+let firebaseReady = false;
+let firestoreError = false;
+
+let items = [];
+let categories = [];
+let transactions = [];
+let bookings = [];
+
+const COL_ITEMS = 'inv_items';
+const COL_CATEGORIES = 'inv_categories';
+const COL_TRANSACTIONS = 'inv_transactions';
+const COL_BOOKINGS = 'inv_bookings';
+
+let dataLoaded = {items:false, categories:false, transactions:false, bookings:false};
+
+function uid(prefix){ return prefix + '_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2,6); }
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+
+window.addEventListener('firebase-ready', ()=>{
+  fb = window.__fb;
+  initFirestoreListeners();
+});
+
+function setConnStatus(online, text){
+  document.getElementById('connDot').className = 'conn-dot ' + (online ? 'online' : 'offline');
+  document.getElementById('connText').textContent = text;
+}
+
+function checkAllLoaded(){
+  if(dataLoaded.items && dataLoaded.categories && dataLoaded.transactions && dataLoaded.bookings){
+    firebaseReady = true;
+    setConnStatus(true, 'Connected to Firestore');
+    render();
+  }
+}
+
+function initFirestoreListeners(){
+  try{
+    const itemsQuery = fb.query(fb.collection(fb.db, COL_ITEMS));
+    fb.onSnapshot(itemsQuery, (snap)=>{
+      items = snap.docs.map(d=>({id:d.id, ...d.data()}));
+      dataLoaded.items = true;
+      checkAllLoaded();
+      if(firebaseReady) render();
+    }, (err)=>{ handleFirestoreError(err); });
+
+    const catQuery = fb.query(fb.collection(fb.db, COL_CATEGORIES));
+    fb.onSnapshot(catQuery, (snap)=>{
+      categories = snap.docs.map(d=>d.data().name).filter(Boolean);
+      dataLoaded.categories = true;
+      checkAllLoaded();
+      if(firebaseReady) render();
+    }, (err)=>{ handleFirestoreError(err); });
+
+    const txQuery = fb.query(fb.collection(fb.db, COL_TRANSACTIONS));
+    fb.onSnapshot(txQuery, (snap)=>{
+      transactions = snap.docs.map(d=>({id:d.id, ...d.data()}));
+      dataLoaded.transactions = true;
+      checkAllLoaded();
+      if(firebaseReady) render();
+    }, (err)=>{ handleFirestoreError(err); });
+
+    const bkQuery = fb.query(fb.collection(fb.db, COL_BOOKINGS));
+    fb.onSnapshot(bkQuery, (snap)=>{
+      bookings = snap.docs.map(d=>({id:d.id, ...d.data()}));
+      dataLoaded.bookings = true;
+      checkAllLoaded();
+      if(firebaseReady) render();
+    }, (err)=>{ handleFirestoreError(err); });
+
+    setTimeout(()=>{
+      if(!firebaseReady && !firestoreError) seedIfEmpty();
+    }, 2500);
+
+  }catch(e){
+    handleFirestoreError(e);
+  }
+}
+
+function handleFirestoreError(err){
+  firestoreError = true;
+  setConnStatus(false, 'Firestore connection error');
+  console.error('Firestore error:', err);
+  const c = document.getElementById('content');
+  c.innerHTML = '<div class="panel"><h2 style="color:var(--danger);">⚠️ Could not connect to Firestore</h2>' +
+    '<p style="color:var(--muted);font-size:14px;">' + escapeHtml(err.message || String(err)) + '</p>' +
+    '<p style="color:var(--muted);font-size:13.5px;">Please verify your Firebase configuration object at the top of this file (apiKey, projectId, etc.) and ensure Firestore is enabled in your Firebase project with rules allowing read/write.</p></div>';
+}
+
+async function seedIfEmpty(){
+  try{
+    const snap = await fb.getDocs(fb.collection(fb.db, COL_ITEMS));
+    if(snap.size > 0) return;
+
+    const seedCategories = ['Tents','Chairs','Tables','Lighting','Decoration','Sound System','Utensils'];
+    for(const c of seedCategories){
+      await fb.addDoc(fb.collection(fb.db, COL_CATEGORIES), {name:c});
+    }
+    const seedItems = [
+      {name:'Wedding Tent (Large)', category:'Tents', quantity:10, issued:0, damaged:0, lost:0, notes:'30x60 ft white tent'},
+      {name:'Steel Folding Chair', category:'Chairs', quantity:500, issued:0, damaged:0, lost:0, notes:'Standard banquet chair'},
+      {name:'Round Table 8-seater', category:'Tables', quantity:60, issued:0, damaged:0, lost:0, notes:''},
+      {name:'LED Par Light', category:'Lighting', quantity:40, issued:0, damaged:0, lost:0, notes:'RGB stage light'},
+      {name:'Flower Backdrop Panel', category:'Decoration', quantity:15, issued:0, damaged:0, lost:0, notes:''},
+      {name:'DJ Speaker Set', category:'Sound System', quantity:8, issued:0, damaged:0, lost:0, notes:'Pair of speakers'},
+      {name:'Steel Plate Set (100pcs)', category:'Utensils', quantity:20, issued:0, damaged:0, lost:0, notes:''},
+      {name:'Generator 5KVA', category:'Lighting', quantity:6, issued:0, damaged:0, lost:0, notes:'Backup power'},
+    ];
+    for(const it of seedItems){
+      await fb.addDoc(fb.collection(fb.db, COL_ITEMS), it);
+    }
+  }catch(e){
+    console.error('Seeding failed', e);
+  }
+}
+
+/* ===================== LOW STOCK THRESHOLD ===================== */
+const LOW_STOCK_THRESHOLD = 5;
+function availableQty(item){ return item.quantity - item.issued - (item.damaged||0) - (item.lost||0); }
+
+/* ===================== TOAST ===================== */
+function showToast(msg, type){
+  type = type || 'success';
+  const container = document.getElementById('toastContainer');
+  const t = document.createElement('div');
+  t.className = 'toast ' + type;
+  t.textContent = msg;
+  container.appendChild(t);
+  setTimeout(function(){ t.style.opacity='0'; t.style.transition='opacity .3s'; setTimeout(function(){ t.remove(); },300); }, 2800);
+}
+
+/* ===================== CONFIRM MODAL ===================== */
+function showConfirm(message, onConfirm, title){
+  title = title || 'Confirm';
+  const root = document.getElementById('modalRoot');
+  root.innerHTML = '<div class="modal-overlay" id="confirmOverlay"><div class="modal"><h3>' + title + '</h3>' +
+    '<p style="color:var(--muted);font-size:14px;">' + message + '</p>' +
+    '<div class="modal-actions"><button class="btn secondary" id="confirmCancel">Cancel</button>' +
+    '<button class="btn danger" id="confirmOk">Confirm</button></div></div></div>';
+  document.getElementById('confirmCancel').onclick = function(){ root.innerHTML=''; };
+  document.getElementById('confirmOk').onclick = function(){ root.innerHTML=''; onConfirm(); };
+}
+function closeModal(){ document.getElementById('modalRoot').innerHTML=''; }
+
+/* ===================== ROUTER ===================== */
+let currentPage = 'dashboard';
+const pageTitles = {
+  dashboard:'Dashboard', inventory:'Inventory', issue:'Issue Items', return:'Return Items',
+  damage:'Damage / Lost Items', current:'Current Out Items', history:'Transaction History',
+  reports:'Reports', data:'Data / Backup'
+};
+
+document.getElementById('navMenu').addEventListener('click', function(e){
+  const btn = e.target.closest('button');
+  if(!btn) return;
+  navMenuButtons().forEach(function(b){ b.classList.remove('active'); });
+  btn.classList.add('active');
+  currentPage = btn.dataset.page;
+  document.getElementById('pageTitle').textContent = pageTitles[currentPage];
+  render();
+  closeSidebarMobile();
+});
+function navMenuButtons(){ return document.querySelectorAll('#navMenu button'); }
+function closeSidebarMobile(){
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('overlayBg').classList.remove('show');
+}
+document.getElementById('menuToggle').onclick = function(){
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('overlayBg').classList.toggle('show');
+};
+document.getElementById('overlayBg').onclick = closeSidebarMobile;
+
+/* ===================== THEME ===================== */
+function applyTheme(theme){
+  document.body.setAttribute('data-theme', theme);
+  document.getElementById('themeToggle').textContent = theme === 'dark' ? '☀️ Light' : '🌙 Dark';
+  localStorage.setItem('tims_theme', theme);
+}
+document.getElementById('themeToggle').onclick = function(){
+  const cur = document.body.getAttribute('data-theme');
+  applyTheme(cur === 'dark' ? 'light' : 'dark');
+};
+applyTheme(localStorage.getItem('tims_theme') || 'light');
+
+/* ===================== HELPERS ===================== */
+function escapeHtml(str){
+  if(str === undefined || str === null) return '';
+  return String(str).replace(/[&<>"']/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
+}
+function formatDate(d){
+  if(!d) return '-';
+  const dt = new Date(d);
+  if(isNaN(dt.getTime())) return d;
+  return dt.toLocaleDateString('en-GB');
+}
+function formatMoney(n){
+  const v = parseFloat(n)||0;
+  return '₹' + v.toLocaleString('en-IN', {maximumFractionDigits:2});
+}
+
+/* ===================== RENDER ROUTER ===================== */
+function render(){
+  if(!firebaseReady) return;
+  const c = document.getElementById('content');
+  if(currentPage === 'dashboard') c.innerHTML = renderDashboard();
+  else if(currentPage === 'inventory') c.innerHTML = renderInventory();
+  else if(currentPage === 'issue') c.innerHTML = renderIssue();
+  else if(currentPage === 'return') c.innerHTML = renderReturn();
+  else if(currentPage === 'damage') c.innerHTML = renderDamage();
+  else if(currentPage === 'current') c.innerHTML = renderCurrentOut();
+  else if(currentPage === 'history') c.innerHTML = renderHistory();
+  else if(currentPage === 'reports') c.innerHTML = renderReports();
+  else if(currentPage === 'data') c.innerHTML = renderData();
+  bindPageEvents();
+}
+
+/* ===================== DASHBOARD ===================== */
+function renderDashboard(){
+  const totalTypes = items.length;
+  const totalQty = items.reduce(function(s,i){ return s+i.quantity; },0);
+  const totalIssued = items.reduce(function(s,i){ return s+i.issued; },0);
+  const totalDamaged = items.reduce(function(s,i){ return s+(i.damaged||0); },0);
+  const totalLost = items.reduce(function(s,i){ return s+(i.lost||0); },0);
+  const lowStock = items.filter(function(i){ const a=availableQty(i); return a <= LOW_STOCK_THRESHOLD && a >= 0; }).length;
+  const totalDue = bookings.reduce(function(s,b){ return s+(parseFloat(b.due)||0); },0);
+
+  const recent = items.length||true ? transactions.slice().sort(function(a,b){ return new Date(b.date)-new Date(a.date); }).slice(0,6) : [];
+
+  let rows = '';
+  if(recent.length){
+    recent.forEach(function(t){
+      rows += '<tr><td><span class="badge ' + badgeClassForType(t.type) + '">' + labelForType(t.type) + '</span></td>' +
+        '<td>' + escapeHtml(t.customerName) + '</td><td>' + escapeHtml(t.itemName) + '</td><td>' + t.quantity + '</td>' +
+        '<td>' + formatDate(t.date) + '</td></tr>';
+    });
+  } else {
+    rows = '<tr><td colspan="5" class="empty-state">No transactions yet</td></tr>';
+  }
+
+  return '<div class="cards">' +
+    '<div class="card accent-blue"><div class="label">Total Item Types</div><div class="value">' + totalTypes + '</div></div>' +
+    '<div class="card accent-green"><div class="label">Total Inventory Quantity</div><div class="value">' + totalQty + '</div></div>' +
+    '<div class="card accent-orange"><div class="label">Total Issued Quantity</div><div class="value">' + totalIssued + '</div></div>' +
+    '<div class="card accent-red"><div class="label">Low Stock Items</div><div class="value">' + lowStock + '</div></div>' +
+    '<div class="card accent-red"><div class="label">Damaged Items</div><div class="value">' + totalDamaged + '</div></div>' +
+    '<div class="card accent-purple"><div class="label">Lost Items</div><div class="value">' + totalLost + '</div></div>' +
+    '<div class="card accent-orange"><div class="label">Total Due Amount</div><div class="value">' + formatMoney(totalDue) + '</div></div>' +
+    '</div>' +
+    '<div class="panel"><h2>Recent Transactions</h2><div class="table-wrap"><table>' +
+    '<thead><tr><th>Type</th><th>Customer</th><th>Item</th><th>Qty</th><th>Date</th></tr></thead>' +
+    '<tbody>' + rows + '</tbody></table></div></div>';
+}
+function badgeClassForType(type){
+  if(type==='issue') return 'out';
+  if(type==='return') return 'ok';
+  if(type==='damage') return 'damage';
+  if(type==='lost') return 'lost';
+  return 'ok';
+}
+function labelForType(type){
+  return {issue:'Issued', return:'Returned', damage:'Damaged', lost:'Lost'}[type] || type;
+}
+
+/* ===================== INVENTORY ===================== */
+let inventorySearch = '';
+let inventoryCategoryFilter = '';
+
+function renderInventory(){
+  const filtered = items.filter(function(i){
+    const matchesSearch = i.name.toLowerCase().includes(inventorySearch.toLowerCase()) || (i.notes||'').toLowerCase().includes(inventorySearch.toLowerCase());
+    const matchesCat = !inventoryCategoryFilter || i.category === inventoryCategoryFilter;
+    return matchesSearch && matchesCat;
+  });
+
+  let catOptions = categories.map(function(c){ return '<option value="' + escapeHtml(c) + '">' + escapeHtml(c) + '</option>'; }).join('');
+  let catFilterOptions = categories.map(function(c){
+    return '<option value="' + escapeHtml(c) + '" ' + (c===inventoryCategoryFilter?'selected':'') + '>' + escapeHtml(c) + '</option>';
+  }).join('');
+
+  let rows = '';
+  if(filtered.length){
+    filtered.forEach(function(i){
+      const avail = availableQty(i);
+      const low = avail <= LOW_STOCK_THRESHOLD;
+      rows += '<tr><td>' + escapeHtml(i.name) + '</td><td><span class="tag-cat">' + escapeHtml(i.category) + '</span></td>' +
+        '<td>' + i.quantity + '</td><td>' + i.issued + '</td><td>' + (i.damaged||0) + '</td><td>' + (i.lost||0) + '</td>' +
+        '<td>' + avail + (low?' <span class="badge low">Low</span>':'') + '</td>' +
+        '<td>' + escapeHtml(i.notes||'-') + '</td>' +
+        '<td><button class="btn small secondary" data-edit-item="' + i.id + '">Edit</button> ' +
+        '<button class="btn small danger" data-delete-item="' + i.id + '">Delete</button></td></tr>';
+    });
+  } else {
+    rows = '<tr><td colspan="9" class="empty-state">No items found</td></tr>';
+  }
+
+  return '<div class="panel"><h2>Add New Item</h2><form id="addItemForm">' +
+    '<div class="row">' +
+    '<div class="field"><label>Item Name *</label><input type="text" id="newItemName" required placeholder="e.g. White Canopy Tent"></div>' +
+    '<div class="field"><label>Quantity *</label><input type="number" id="newItemQty" min="0" required placeholder="0"></div>' +
+    '<div class="field"><label>Category *</label><select id="newItemCategory" required>' +
+    '<option value="">Select Category</option>' + catOptions + '<option value="__new__">+ Add New Category</option></select></div>' +
+    '</div>' +
+    '<div class="field" id="newCategoryField" style="display:none;"><label>New Category Name</label>' +
+    '<input type="text" id="newCategoryName" placeholder="Enter category name"></div>' +
+    '<div class="field"><label>Notes</label><textarea id="newItemNotes" placeholder="Optional notes"></textarea></div>' +
+    '<button class="btn" type="submit">➕ Add Item</button></form></div>' +
+    '<div class="panel"><h2>Inventory (' + filtered.length + ' of ' + items.length + ')</h2>' +
+    '<div class="search-bar"><input type="text" id="invSearchInput" placeholder="🔍 Search items..." value="' + escapeHtml(inventorySearch) + '">' +
+    '<select id="invCategoryFilter"><option value="">All Categories</option>' + catFilterOptions + '</select></div>' +
+    '<div class="table-wrap"><table><thead><tr><th>Name</th><th>Category</th><th>Total</th><th>Issued</th><th>Damaged</th><th>Lost</th><th>Available</th><th>Notes</th><th>Actions</th></tr></thead>' +
+    '<tbody>' + rows + '</tbody></table></div></div>';
+}
+
+function openEditItemModal(itemId){
+  const item = items.find(function(i){ return i.id===itemId; });
+  if(!item) return;
+  const root = document.getElementById('modalRoot');
+  const minQty = item.issued + (item.damaged||0) + (item.lost||0);
+  let catOptions = categories.map(function(c){
+    return '<option value="' + escapeHtml(c) + '" ' + (c===item.category?'selected':'') + '>' + escapeHtml(c) + '</option>';
+  }).join('');
+
+  root.innerHTML = '<div class="modal-overlay" id="editOverlay"><div class="modal"><h3>Edit Item</h3>' +
+    '<div class="field"><label>Item Name</label><input type="text" id="editName" value="' + escapeHtml(item.name) + '"></div>' +
+    '<div class="field"><label>Total Quantity</label><input type="number" id="editQty" min="' + minQty + '" value="' + item.quantity + '"></div>' +
+    '<div class="field"><label>Category</label><select id="editCategory">' + catOptions + '</select></div>' +
+    '<div class="field"><label>Notes</label><textarea id="editNotes">' + escapeHtml(item.notes||'') + '</textarea></div>' +
+    '<p style="font-size:12.5px;color:var(--muted);">Issued: ' + item.issued + ', Damaged: ' + (item.damaged||0) + ', Lost: ' + (item.lost||0) + '. Total quantity cannot be set below ' + minQty + '.</p>' +
+    '<div class="modal-actions"><button class="btn secondary" id="editCancel">Cancel</button><button class="btn" id="editSave">Save Changes</button></div></div></div>';
+
+  document.getElementById('editCancel').onclick = closeModal;
+  document.getElementById('editSave').onclick = async function(){
+    const name = document.getElementById('editName').value.trim();
+    const qty = parseInt(document.getElementById('editQty').value, 10);
+    const category = document.getElementById('editCategory').value;
+    const notes = document.getElementById('editNotes').value.trim();
+    if(!name){ showToast('Item name is required', 'error'); return; }
+    if(isNaN(qty) || qty < minQty){ showToast('Quantity cannot be less than ' + minQty, 'error'); return; }
+    try{
+      await fb.updateDoc(fb.doc(fb.db, COL_ITEMS, item.id), {name:name, quantity:qty, category:category, notes:notes});
+      closeModal();
+      showToast('Item updated successfully');
+    }catch(e){ showToast('Update failed: ' + e.message, 'error'); }
+  };
+}
+
+/* ===================== ISSUE ITEMS ===================== */
+let issueSelectedItems = [];
+
+function renderIssue(){
+  const availableItems = items.filter(function(i){ return availableQty(i) > 0; });
+  let itemOptions = availableItems.map(function(i){
+    return '<option value="' + i.id + '">' + escapeHtml(i.name) + ' (Available: ' + availableQty(i) + ')</option>';
+  }).join('');
+
+  return '<div class="panel"><h2>Issue Items to Customer</h2>' +
+    '<div class="row">' +
+    '<div class="field"><label>Event / Booking Name *</label><input type="text" id="issueEventName" placeholder="e.g. Sharma Wedding"></div>' +
+    '<div class="field"><label>Customer Name *</label><input type="text" id="issueCustomerName" placeholder="Full name"></div>' +
+    '<div class="field"><label>Mobile Number *</label><input type="tel" id="issueCustomerPhone" placeholder="10-digit mobile"></div>' +
+    '</div>' +
+    '<div class="row">' +
+    '<div class="field"><label>Date *</label><input type="date" id="issueDate" value="' + todayStr() + '"></div>' +
+    '<div class="field"><label>Total Amount</label><input type="number" id="issueTotalAmount" min="0" placeholder="0.00"></div>' +
+    '<div class="field"><label>Advance Paid</label><input type="number" id="issueAdvance" min="0" placeholder="0.00"></div>' +
+    '</div>' +
+    '<h3 style="font-size:14px;margin-top:18px;">Select Items</h3>' +
+    '<div class="item-select-row"><select id="issueItemSelect"><option value="">-- Select Item --</option>' + itemOptions + '</select>' +
+    '<input type="number" id="issueItemQty" min="1" placeholder="Quantity">' +
+    '<button class="btn secondary" id="addIssueItemBtn" type="button">+ Add</button></div>' +
+    '<div class="selected-items-list" id="selectedItemsList">' + renderSelectedIssueItems() + '</div>' +
+    '<button class="btn" id="confirmIssueBtn" style="margin-top:16px;" type="button">📤 Issue Items</button></div>';
+}
+
+function renderSelectedIssueItems(){
+  if(issueSelectedItems.length === 0) return '<div class="empty-state">No items selected yet</div>';
+  return issueSelectedItems.map(function(sel, idx){
+    const item = items.find(function(i){ return i.id===sel.itemId; });
+    if(!item) return '';
+    return '<div class="selected-item-row"><span>' + escapeHtml(item.name) + '</span>' +
+      '<span class="stock-info">Available: ' + availableQty(item) + '</span>' +
+      '<input type="number" min="1" max="' + (availableQty(item)+sel.qty) + '" value="' + sel.qty + '" data-update-issue-qty="' + idx + '">' +
+      '<button class="btn small danger" data-remove-issue-item="' + idx + '" type="button">Remove</button></div>';
+  }).join('');
+}
+
+/* ===================== RETURN ITEMS ===================== */
+function renderReturn(){
+  const pendingMap = computePendingTransactions();
+  const groups = groupPendingByCustomer(pendingMap);
+  let opts = groups.map(function(g){
+    return '<option value="' + escapeHtml(g.key) + '">' + escapeHtml(g.eventName) + ' - ' + escapeHtml(g.customerName) + ' (' + escapeHtml(g.phone) + ') - Issued ' + formatDate(g.date) + ' - ' + g.items.length + ' item(s) pending</option>';
+  }).join('');
+
+  return '<div class="panel"><h2>Return Items</h2>' +
+    '<div class="field"><label>Select Customer Transaction</label><select id="returnCustomerSelect">' +
+    '<option value="">-- Select Customer / Booking --</option>' + opts + '</select></div>' +
+    '<div id="returnItemsArea"></div></div>';
+}
+
+function computePendingTransactions(){
+  const issueTx = transactions.filter(function(t){ return t.type==='issue'; });
+  const returnTx = transactions.filter(function(t){ return t.type==='return'; });
+  const damageTx = transactions.filter(function(t){ return t.type==='damage' || t.type==='lost'; });
+  return issueTx.map(function(it){
+    const returnedQty = returnTx.filter(function(rt){ return rt.refIssueId === it.id; }).reduce(function(s,rt){ return s+rt.quantity; },0);
+    const lostDamagedQty = damageTx.filter(function(dt){ return dt.refIssueId === it.id; }).reduce(function(s,dt){ return s+dt.quantity; },0);
+    const pending = it.quantity - returnedQty - lostDamagedQty;
+    return Object.assign({}, it, {pending:pending});
+  }).filter(function(it){ return it.pending > 0; });
+}
+
+function groupPendingByCustomer(pendingList){
+  const groups = {};
+  pendingList.forEach(function(p){
+    const key = p.batchId;
+    if(!groups[key]) groups[key] = { key:key, customerName:p.customerName, phone:p.phone, date:p.date, eventName:p.eventName||'', items:[] };
+    groups[key].items.push(p);
+  });
+  return Object.values(groups);
+}
+
+function renderReturnItemsArea(groupKey){
+  const pendingList = computePendingTransactions();
+  const groups = groupPendingByCustomer(pendingList);
+  const group = groups.find(function(g){ return g.key === groupKey; });
+  const area = document.getElementById('returnItemsArea');
+  if(!group){ area.innerHTML=''; return; }
+  let rows = group.items.map(function(it){
+    return '<div class="selected-item-row"><span>' + escapeHtml(it.itemName) + '</span>' +
+      '<span class="stock-info">Pending: ' + it.pending + '</span>' +
+      '<input type="number" min="0" max="' + it.pending + '" value="0" data-return-qty="' + it.id + '"></div>';
+  }).join('');
+  area.innerHTML = '<h3 style="font-size:14px;margin-top:18px;">Items to Return</h3>' +
+    '<div class="selected-items-list">' + rows + '</div>' +
+    '<button class="btn success" id="confirmReturnBtn" type="button" style="margin-top:14px;" data-group="' + escapeHtml(groupKey) + '">📥 Confirm Return</button>';
+}
+
+/* ===================== DAMAGE / LOST ===================== */
+function renderDamage(){
+  const pendingList = computePendingTransactions();
+  const groups = groupPendingByCustomer(pendingList);
+  let opts = groups.map(function(g){
+    return '<option value="' + escapeHtml(g.key) + '">' + escapeHtml(g.eventName) + ' - ' + escapeHtml(g.customerName) + ' (' + escapeHtml(g.phone) + ') - Issued ' + formatDate(g.date) + '</option>';
+  }).join('');
+
+  let dlItems = items.filter(function(i){ return (i.damaged||0)>0 || (i.lost||0)>0; });
+  let dlRows = dlItems.length ? dlItems.map(function(i){
+    return '<tr><td>' + escapeHtml(i.name) + '</td><td><span class="badge damage">' + (i.damaged||0) + '</span></td><td><span class="badge lost">' + (i.lost||0) + '</span></td></tr>';
+  }).join('') : '<tr><td colspan="3" class="empty-state">No damaged or lost items recorded</td></tr>';
+
+  return '<div class="panel"><h2>Report Damaged or Lost Items</h2>' +
+    '<div class="field"><label>Select Customer / Booking with Issued Items</label><select id="damageCustomerSelect">' +
+    '<option value="">-- Select Customer / Booking --</option>' + opts + '</select></div>' +
+    '<div id="damageItemsArea"></div></div>' +
+    '<div class="panel"><h2>Damaged / Lost Items Summary</h2><div class="table-wrap"><table>' +
+    '<thead><tr><th>Item</th><th>Damaged</th><th>Lost</th></tr></thead><tbody>' + dlRows + '</tbody></table></div></div>';
+}
+
+function renderDamageItemsArea(groupKey){
+  const pendingList = computePendingTransactions();
+  const groups = groupPendingByCustomer(pendingList);
+  const group = groups.find(function(g){ return g.key === groupKey; });
+  const area = document.getElementById('damageItemsArea');
+  if(!group){ area.innerHTML=''; return; }
+  let rows = group.items.map(function(it){
+    return '<div class="selected-item-row"><span>' + escapeHtml(it.itemName) + '</span>' +
+      '<span class="stock-info">Pending: ' + it.pending + '</span>' +
+      '<select data-damage-type="' + it.id + '"><option value="">None</option><option value="damage">Damaged</option><option value="lost">Lost</option></select>' +
+      '<input type="number" min="0" max="' + it.pending + '" value="0" data-damage-qty="' + it.id + '"></div>';
+  }).join('');
+  area.innerHTML = '<h3 style="font-size:14px;margin-top:18px;">Mark Items as Damaged or Lost</h3>' +
+    '<div class="selected-items-list">' + rows + '</div>' +
+    '<button class="btn warning" id="confirmDamageBtn" type="button" style="margin-top:14px;" data-group="' + escapeHtml(groupKey) + '">⚠️ Confirm Damage / Lost Report</button>';
+}
+
+/* ===================== CURRENT OUT ===================== */
+let currentOutSearch = '';
+
+function renderCurrentOut(){
+  const pending = computePendingTransactions();
+  const filtered = pending.filter(function(p){
+    return p.customerName.toLowerCase().includes(currentOutSearch.toLowerCase()) ||
+      (p.phone||'').includes(currentOutSearch) ||
+      (p.eventName||'').toLowerCase().includes(currentOutSearch.toLowerCase());
+  });
+
+  let rows = filtered.length ? filtered.map(function(p){
+    const booking = bookings.find(function(b){ return b.batchId===p.batchId; });
+    return '<tr><td>' + escapeHtml(p.eventName||'-') + '</td><td>' + escapeHtml(p.customerName) + '</td>' +
+      '<td>' + escapeHtml(p.phone) + '</td><td>' + escapeHtml(p.itemName) + '</td><td>' + formatDate(p.date) + '</td>' +
+      '<td><span class="badge out">' + p.pending + '</span></td><td>' + (booking ? formatMoney(booking.due) : '-') + '</td></tr>';
+  }).join('') : '<tr><td colspan="7" class="empty-state">No items currently out</td></tr>';
+
+  return '<div class="panel"><h2>Currently Issued / Out Items</h2>' +
+    '<div class="search-bar"><input type="text" id="currentOutSearchInput" placeholder="🔍 Search by customer, phone, or event..." value="' + escapeHtml(currentOutSearch) + '"></div>' +
+    '<div class="table-wrap"><table><thead><tr><th>Event</th><th>Customer</th><th>Phone</th><th>Item</th><th>Date Issued</th><th>Pending Qty</th><th>Due Amount</th></tr></thead>' +
+    '<tbody>' + rows + '</tbody></table></div></div>';
+}
+
+/* ===================== HISTORY ===================== */
+let historySearch = '';
+let historyCustomerFilter = '';
+let historyTypeFilter = '';
+
+function renderHistory(){
+  const allCustomers = Array.from(new Set(transactions.map(function(t){ return t.customerName; })));
+  const filtered = transactions.filter(function(t){
+    const matchesSearch = (t.customerName||'').toLowerCase().includes(historySearch.toLowerCase()) ||
+      (t.itemName||'').toLowerCase().includes(historySearch.toLowerCase()) ||
+      (t.phone||'').includes(historySearch) ||
+      (t.eventName||'').toLowerCase().includes(historySearch.toLowerCase());
+    const matchesCustomer = !historyCustomerFilter || t.customerName === historyCustomerFilter;
+    const matchesType = !historyTypeFilter || t.type === historyTypeFilter;
+    return matchesSearch && matchesCustomer && matchesType;
+  }).sort(function(a,b){ return new Date(b.date)-new Date(a.date); });
+
+  let custOptions = allCustomers.map(function(c){
+    return '<option value="' + escapeHtml(c) + '" ' + (c===historyCustomerFilter?'selected':'') + '>' + escapeHtml(c) + '</option>';
+  }).join('');
+
+  let rows = filtered.length ? filtered.map(function(t){
+    return '<tr><td><span class="badge ' + badgeClassForType(t.type) + '">' + labelForType(t.type) + '</span></td>' +
+      '<td>' + escapeHtml(t.eventName||'-') + '</td><td>' + escapeHtml(t.customerName) + '</td>' +
+      '<td>' + escapeHtml(t.phone||'-') + '</td><td>' + escapeHtml(t.itemName) + '</td><td>' + t.quantity + '</td>' +
+      '<td>' + formatDate(t.date) + '</td></tr>';
+  }).join('') : '<tr><td colspan="7" class="empty-state">No history found</td></tr>';
+
+  return '<div class="panel"><h2>Complete Transaction History</h2>' +
+    '<div class="search-bar"><input type="text" id="historySearchInput" placeholder="🔍 Search by customer, item, phone, event..." value="' + escapeHtml(historySearch) + '">' +
+    '<select id="historyCustomerFilter"><option value="">All Customers</option>' + custOptions + '</select>' +
+    '<select id="historyTypeFilter"><option value="">All Types</option>' +
+    '<option value="issue" ' + (historyTypeFilter==='issue'?'selected':'') + '>Issued</option>' +
+    '<option value="return" ' + (historyTypeFilter==='return'?'selected':'') + '>Returned</option>' +
+    '<option value="damage" ' + (historyTypeFilter==='damage'?'selected':'') + '>Damaged</option>' +
+    '<option value="lost" ' + (historyTypeFilter==='lost'?'selected':'') + '>Lost</option></select></div>' +
+    '<div class="table-wrap"><table><thead><tr><th>Type</th><th>Event</th><th>Customer</th><th>Phone</th><th>Item</th><th>Qty</th><th>Date</th></tr></thead>' +
+    '<tbody>' + rows + '</tbody></table></div></div>';
+}
+
+/* ===================== REPORTS ===================== */
+function renderReports(){
+  const lowStockItems = items.filter(function(i){ return availableQty(i) <= LOW_STOCK_THRESHOLD; });
+  const totalQty = items.reduce(function(s,i){ return s+i.quantity; },0);
+  const totalIssued = items.reduce(function(s,i){ return s+i.issued; },0);
+  const totalDamaged = items.reduce(function(s,i){ return s+(i.damaged||0); },0);
+  const totalLost = items.reduce(function(s,i){ return s+(i.lost||0); },0);
+  const totalAvailable = totalQty - totalIssued - totalDamaged - totalLost;
+
+  const totalRevenue = bookings.reduce(function(s,b){ return s+(parseFloat(b.totalAmount)||0); },0);
+  const totalCollected = bookings.reduce(function(s,b){ return s+(parseFloat(b.advance)||0); },0);
+  const totalDue = bookings.reduce(function(s,b){ return s+(parseFloat(b.due)||0); },0);
+
+  let lowStockRows = lowStockItems.length ? lowStockItems.map(function(i){
+    return '<tr><td>' + escapeHtml(i.name) + '</td><td><span class="tag-cat">' + escapeHtml(i.category) + '</span></td>' +
+      '<td>' + i.quantity + '</td><td>' + i.issued + '</td><td><span class="badge low">' + availableQty(i) + '</span></td></tr>';
+  }).join('') : '<tr><td colspan="5" class="empty-state">No low stock items 🎉</td></tr>';
+
+  let catRows = categories.map(function(cat){
+    const catItems = items.filter(function(i){ return i.category===cat; });
+    if(catItems.length===0) return '';
+    const q = catItems.reduce(function(s,i){ return s+i.quantity; },0);
+    const iss = catItems.reduce(function(s,i){ return s+i.issued; },0);
+    const dl = catItems.reduce(function(s,i){ return s+(i.damaged||0)+(i.lost||0); },0);
+    return '<tr><td>' + escapeHtml(cat) + '</td><td>' + catItems.length + '</td><td>' + q + '</td><td>' + iss + '</td><td>' + (q-iss-dl) + '</td></tr>';
+  }).join('') || '<tr><td colspan="5" class="empty-state">No categories yet</td></tr>';
+
+  let bookingRows = bookings.length ? bookings.slice().sort(function(a,b){ return new Date(b.date)-new Date(a.date); }).map(function(b){
+    return '<tr><td>' + escapeHtml(b.eventName||'-') + '</td><td>' + escapeHtml(b.customerName) + '</td>' +
+      '<td>' + escapeHtml(b.phone) + '</td><td>' + formatDate(b.date) + '</td><td>' + formatMoney(b.totalAmount) + '</td>' +
+      '<td>' + formatMoney(b.advance) + '</td><td>' + formatMoney(b.due) + '</td><td>' + paymentStatusBadge(b) + '</td></tr>';
+  }).join('') : '<tr><td colspan="8" class="empty-state">No bookings yet</td></tr>';
+
+  return '<div class="panel"><h2>Low Stock Report (threshold: ' + LOW_STOCK_THRESHOLD + ' units available)</h2>' +
+    '<div class="table-wrap"><table><thead><tr><th>Item</th><th>Category</th><th>Total Qty</th><th>Issued</th><th>Available</th></tr></thead>' +
+    '<tbody>' + lowStockRows + '</tbody></table></div></div>' +
+    '<div class="panel"><h2>Inventory Summary</h2><div class="cards">' +
+    '<div class="card accent-blue"><div class="label">Total Item Types</div><div class="value">' + items.length + '</div></div>' +
+    '<div class="card accent-green"><div class="label">Total Quantity</div><div class="value">' + totalQty + '</div></div>' +
+    '<div class="card accent-orange"><div class="label">Total Issued</div><div class="value">' + totalIssued + '</div></div>' +
+    '<div class="card accent-blue"><div class="label">Total Available</div><div class="value">' + totalAvailable + '</div></div>' +
+    '<div class="card accent-red"><div class="label">Total Damaged</div><div class="value">' + totalDamaged + '</div></div>' +
+    '<div class="card accent-purple"><div class="label">Total Lost</div><div class="value">' + totalLost + '</div></div></div>' +
+    '<div class="table-wrap"><table><thead><tr><th>Category</th><th>Item Types</th><th>Total Qty</th><th>Issued</th><th>Available</th></tr></thead>' +
+    '<tbody>' + catRows + '</tbody></table></div></div>' +
+    '<div class="panel"><h2>Payment Report</h2><div class="cards">' +
+    '<div class="card accent-blue"><div class="label">Total Booking Value</div><div class="value">' + formatMoney(totalRevenue) + '</div></div>' +
+    '<div class="card accent-green"><div class="label">Total Advance Collected</div><div class="value">' + formatMoney(totalCollected) + '</div></div>' +
+    '<div class="card accent-red"><div class="label">Total Due</div><div class="value">' + formatMoney(totalDue) + '</div></div></div>' +
+    '<div class="table-wrap"><table><thead><tr><th>Event</th><th>Customer</th><th>Phone</th><th>Date</th><th>Total</th><th>Advance</th><th>Due</th><th>Status</th></tr></thead>' +
+    '<tbody>' + bookingRows + '</tbody></table></div></div>';
+}
+
+function paymentStatusBadge(b){
+  const due = parseFloat(b.due)||0;
+  const total = parseFloat(b.totalAmount)||0;
+  if(due <= 0 && total > 0) return '<span class="badge paid">Paid</span>';
+  if(due > 0 && (parseFloat(b.advance)||0) > 0) return '<span class="badge partial">Partial</span>';
+  return '<span class="badge unpaid">Unpaid</span>';
+}
+
+/* ===================== DATA / BACKUP ===================== */
+function renderData(){
+  let catRows = categories.map(function(c){
+    const count = items.filter(function(i){ return i.category===c; }).length;
+    const action = count===0 ? '<button class="btn small danger" data-delete-category="' + escapeHtml(c) + '" type="button">Delete</button>' : '<span style="color:var(--muted);font-size:12px;">In use</span>';
+    return '<tr><td>' + escapeHtml(c) + '</td><td>' + count + '</td><td>' + action + '</td></tr>';
+  }).join('') || '<tr><td colspan="3" class="empty-state">No categories yet</td></tr>';
+
+  return '<div class="panel"><h2>Export Data (CSV)</h2>' +
+    '<p style="color:var(--muted);font-size:13.5px;">Download your inventory, transactions, and bookings as CSV files.</p>' +
+    '<div class="row"><button class="btn" id="exportInventoryBtn" type="button">⬇️ Export Inventory CSV</button>' +
+    '<button class="btn" id="exportTransactionsBtn" type="button">⬇️ Export Transactions CSV</button>' +
+    '<button class="btn" id="exportBookingsBtn" type="button">⬇️ Export Bookings CSV</button></div></div>' +
+    '<div class="panel"><h2>JSON Backup</h2>' +
+    '<p style="color:var(--muted);font-size:13.5px;">Export a full JSON backup of all Firestore data, or import a backup to restore data.</p>' +
+    '<div class="row"><button class="btn secondary" id="exportJsonBtn" type="button">⬇️ Export JSON Backup</button></div>' +
+    '<div class="field" style="margin-top:14px;"><label>Import JSON Backup</label><input type="file" id="importJsonInput" accept="application/json"></div>' +
+    '<button class="btn warning" id="importJsonBtn" type="button">⬆️ Import Backup</button></div>' +
+    '<div class="panel"><h2>Manage Categories</h2>' +
+    '<div class="row"><div class="field"><label>New Category</label><input type="text" id="newCategoryInput" placeholder="Category name"></div>' +
+    '<div style="align-self:flex-end;"><button class="btn secondary" id="addCategoryBtn" type="button">+ Add Category</button></div></div>' +
+    '<div class="table-wrap"><table><thead><tr><th>Category</th><th>Items Using It</th><th>Action</th></tr></thead>' +
+    '<tbody>' + catRows + '</tbody></table></div></div>' +
+    '<div class="panel"><h2>Reset / Danger Zone</h2>' +
+    '<p style="color:var(--muted);font-size:13.5px;">This will permanently erase ALL inventory, categories, transactions, and bookings stored in Firestore.</p>' +
+    '<button class="btn danger" id="resetAllBtn" type="button">🗑️ Clear All Firestore Data</button></div>';
+}
+
+function exportCSV(filename, rows){
+  if(rows.length === 0){ showToast('No data to export', 'warning'); return; }
+  const headers = Object.keys(rows[0]);
+  const csvContent = [
+    headers.join(','),
+    rows.map(function(r){
+      return headers.map(function(h){
+        let val = r[h] === undefined || r[h] === null ? '' : String(r[h]);
+        val = val.replace(/"/g,'""');
+        if(val.includes(',') || val.includes('\n') || val.includes('"')) val = '"' + val + '"';
+        return val;
+      }).join(',');
+    }).join('\n')
+  ].join('\n');
+  const blob = new Blob([csvContent], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function exportJSONBackup(){
+  const backup = {
+    exportedAt: new Date().toISOString(),
+    items: items, categories: categories.map(function(name){ return {name:name}; }), transactions: transactions, bookings: bookings
+  };
+  const blob = new Blob([JSON.stringify(backup, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'tent_house_backup_' + todayStr() + '.json';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+async function importJSONBackup(jsonText){
+  let data;
+  try{ data = JSON.parse(jsonText); }
+  catch(e){ showToast('Invalid JSON file', 'error'); return; }
+
+  if(!data || (!data.items && !data.categories && !data.transactions && !data.bookings)){
+    showToast('Backup file does not contain valid data', 'error'); return;
+  }
+
+  try{
+    if(Array.isArray(data.categories)){
+      for(const c of data.categories){
+        const name = typeof c === 'string' ? c : c.name;
+        if(!name || categories.includes(name)) continue;
+        await fb.addDoc(fb.collection(fb.db, COL_CATEGORIES), {name:name});
+      }
+    }
+    if(Array.isArray(data.items)){
+      for(const it of data.items){
+        const rest = Object.assign({}, it);
+        delete rest.id;
+        await fb.addDoc(fb.collection(fb.db, COL_ITEMS), rest);
+      }
+    }
+    if(Array.isArray(data.bookings)){
+      for(const b of data.bookings){
+        const rest = Object.assign({}, b);
+        delete rest.id;
+        await fb.addDoc(fb.collection(fb.db, COL_BOOKINGS), rest);
+      }
+    }
+    if(Array.isArray(data.transactions)){
+      for(const t of data.transactions){
+        const rest = Object.assign({}, t);
+        delete rest.id;
+        await fb.addDoc(fb.collection(fb.db, COL_TRANSACTIONS), rest);
+      }
+    }
+    showToast('Backup imported successfully');
+  }catch(e){
+    showToast('Import failed: ' + e.message, 'error');
+  }
+}
+
+/* ===================== EVENT BINDING PER PAGE ===================== */
+function bindPageEvents(){
+  if(currentPage === 'inventory') bindInventoryEvents();
+  else if(currentPage === 'issue') bindIssueEvents();
+  else if(currentPage === 'return') bindReturnEvents();
+  else if(currentPage === 'damage') bindDamageEvents();
+  else if(currentPage === 'current') bindCurrentOutEvents();
+  else if(currentPage === 'history') bindHistoryEvents();
+  else if(currentPage === 'data') bindDataEvents();
+}
+
+function bindInventoryEvents(){
+  const categorySelect = document.getElementById('newItemCategory');
+  const newCatField = document.getElementById('newCategoryField');
+  categorySelect.addEventListener('change', function(){
+    newCatField.style.display = categorySelect.value === '__new__' ? 'block' : 'none';
+  });
+
+  document.getElementById('addItemForm').addEventListener('submit', async function(e){
+    e.preventDefault();
+    const name = document.getElementById('newItemName').value.trim();
+    const qty = parseInt(document.getElementById('newItemQty').value, 10);
+    let category = document.getElementById('newItemCategory').value;
+    const notes = document.getElementById('newItemNotes').value.trim();
+
+    if(!name){ showToast('Item name is required', 'error'); return; }
+    if(isNaN(qty) || qty < 0){ showToast('Quantity must be a valid non-negative number', 'error'); return; }
+    if(!category){ showToast('Please select or add a category', 'error'); return; }
+
+    try{
+      if(category === '__new__'){
+        const newCat = document.getElementById('newCategoryName').value.trim();
+        if(!newCat){ showToast('Please enter a new category name', 'error'); return; }
+        if(!categories.includes(newCat)){
+          await fb.addDoc(fb.collection(fb.db, COL_CATEGORIES), {name:newCat});
+        }
+        category = newCat;
+      }
+      await fb.addDoc(fb.collection(fb.db, COL_ITEMS), { name:name, category:category, quantity:qty, issued:0, damaged:0, lost:0, notes:notes });
+      showToast('Item added successfully');
+    }catch(err){ showToast('Failed to add item: ' + err.message, 'error'); }
+  });
+
+  document.getElementById('invSearchInput').addEventListener('input', function(e){
+    inventorySearch = e.target.value;
+    render();
+    setTimeout(function(){ const el=document.getElementById('invSearchInput'); if(el){ el.focus(); el.selectionStart = el.selectionEnd = el.value.length; } },0);
+  });
+  document.getElementById('invCategoryFilter').addEventListener('change', function(e){
+    inventoryCategoryFilter = e.target.value;
+    render();
+  });
+
+  document.querySelectorAll('[data-edit-item]').forEach(function(btn){
+    btn.addEventListener('click', function(){ openEditItemModal(btn.dataset.editItem); });
+  });
+  document.querySelectorAll('[data-delete-item]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      const item = items.find(function(i){ return i.id===btn.dataset.deleteItem; });
+      if(!item) return;
+      if(item.issued > 0){ showToast('Cannot delete an item that currently has issued quantity', 'error'); return; }
+      showConfirm('Delete "' + escapeHtml(item.name) + '"? This cannot be undone.', async function(){
+        try{
+          await fb.deleteDoc(fb.doc(fb.db, COL_ITEMS, item.id));
+          showToast('Item deleted');
+        }catch(err){ showToast('Delete failed: ' + err.message, 'error'); }
+      }, 'Delete Item');
+    });
+  });
+}
+
+function bindIssueEvents(){
+  document.getElementById('addIssueItemBtn').addEventListener('click', function(){
+    const itemId = document.getElementById('issueItemSelect').value;
+    const qty = parseInt(document.getElementById('issueItemQty').value, 10);
+    if(!itemId){ showToast('Please select an item', 'error'); return; }
+    if(isNaN(qty) || qty <= 0){ showToast('Please enter a valid quantity', 'error'); return; }
+    const item = items.find(function(i){ return i.id===itemId; });
+    if(!item){ showToast('Item not found', 'error'); return; }
+
+    const existing = issueSelectedItems.find(function(s){ return s.itemId===itemId; });
+    const currentlySelected = existing ? existing.qty : 0;
+    if(qty + currentlySelected > availableQty(item)){
+      showToast('Only ' + availableQty(item) + ' units available for ' + item.name, 'error');
+      return;
+    }
+    if(existing){ existing.qty += qty; }
+    else { issueSelectedItems.push({itemId:itemId, qty:qty}); }
+
+    document.getElementById('issueItemQty').value = '';
+    document.getElementById('issueItemSelect').value = '';
+    document.getElementById('selectedItemsList').innerHTML = renderSelectedIssueItems();
+    bindSelectedIssueItemEvents();
+  });
+
+  bindSelectedIssueItemEvents();
+
+  document.getElementById('confirmIssueBtn').addEventListener('click', async function(){
+    const eventName = document.getElementById('issueEventName').value.trim();
+    const customerName = document.getElementById('issueCustomerName').value.trim();
+    const phone = document.getElementById('issueCustomerPhone').value.trim();
+    const date = document.getElementById('issueDate').value;
+    const totalAmount = parseFloat(document.getElementById('issueTotalAmount').value) || 0;
+    const advance = parseFloat(document.getElementById('issueAdvance').value) || 0;
+
+    if(!eventName){ showToast('Event / booking name is required', 'error'); return; }
+    if(!customerName){ showToast('Customer name is required', 'error'); return; }
+    if(!phone){ showToast('Mobile number is required', 'error'); return; }
+    if(!/^[0-9+\-\s]{7,15}$/.test(phone)){ showToast('Please enter a valid mobile number', 'error'); return; }
+    if(!date){ showToast('Please select a date', 'error'); return; }
+    if(issueSelectedItems.length === 0){ showToast('Please select at least one item to issue', 'error'); return; }
+    if(advance > totalAmount){ showToast('Advance cannot be greater than total amount', 'error'); return; }
+
+    for(const sel of issueSelectedItems){
+      const item = items.find(function(i){ return i.id===sel.itemId; });
+      if(!item || sel.qty <= 0 || sel.qty > availableQty(item)){
+        showToast('Insufficient stock for ' + (item ? item.name : 'selected item'), 'error');
+        return;
+      }
+    }
+
+    const batchId = uid('batch');
+    const due = Math.max(0, totalAmount - advance);
+
+    try{
+      await fb.addDoc(fb.collection(fb.db, COL_BOOKINGS), {
+        batchId:batchId, eventName:eventName, customerName:customerName, phone:phone, date:date, totalAmount:totalAmount, advance:advance, due:due
+      });
+
+      for(const sel of issueSelectedItems){
+        const item = items.find(function(i){ return i.id===sel.itemId; });
+        await fb.updateDoc(fb.doc(fb.db, COL_ITEMS, item.id), { issued: item.issued + sel.qty });
+        await fb.addDoc(fb.collection(fb.db, COL_TRANSACTIONS), {
+          type:'issue', batchId:batchId, eventName:eventName, customerName:customerName, phone:phone, date:date,
+          itemId: item.id, itemName: item.name, quantity: sel.qty
+        });
+      }
+
+      issueSelectedItems = [];
+      showToast('Items issued successfully');
+    }catch(err){ showToast('Issue failed: ' + err.message, 'error'); }
+  });
+}
+
+function bindSelectedIssueItemEvents(){
+  document.querySelectorAll('[data-update-issue-qty]').forEach(function(inp){
+    inp.addEventListener('change', function(){
+      const idx = parseInt(inp.dataset.updateIssueQty, 10);
+      const sel = issueSelectedItems[idx];
+      const item = items.find(function(i){ return i.id===sel.itemId; });
+      const maxAllowed = availableQty(item) + sel.qty;
+      let val = parseInt(inp.value, 10);
+      if(isNaN(val) || val <= 0){ showToast('Quantity must be greater than 0', 'error'); val = sel.qty; }
+      if(val > maxAllowed){ showToast('Maximum available is ' + maxAllowed, 'error'); val = maxAllowed; }
+      sel.qty = val;
+      document.getElementById('selectedItemsList').innerHTML = renderSelectedIssueItems();
+      bindSelectedIssueItemEvents();
+    });
+  });
+  document.querySelectorAll('[data-remove-issue-item]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      const idx = parseInt(btn.dataset.removeIssueItem, 10);
+      issueSelectedItems.splice(idx,1);
+      document.getElementById('selectedItemsList').innerHTML = renderSelectedIssueItems();
+      bindSelectedIssueItemEvents();
+    });
+  });
+}
+
+function bindReturnEvents(){
+  document.getElementById('returnCustomerSelect').addEventListener('change', function(e){
+    renderReturnItemsArea(e.target.value);
+    bindReturnConfirmEvent();
+  });
+}
+
+function bindReturnConfirmEvent(){
+  const btn = document.getElementById('confirmReturnBtn');
+  if(!btn) return;
+  btn.addEventListener('click', async function(){
+    const inputs = document.querySelectorAll('[data-return-qty]');
+    let anyReturned = false;
+    const returnsToProcess = [];
+
+    inputs.forEach(function(inp){
+      const issueId = inp.dataset.returnQty;
+      const qty = parseInt(inp.value, 10) || 0;
+      if(qty > 0){
+        anyReturned = true;
+        returnsToProcess.push({issueId:issueId, qty:qty});
+      }
+    });
+
+    if(!anyReturned){ showToast('Please enter a quantity to return', 'error'); return; }
+
+    const pendingList = computePendingTransactions();
+
+    for(const r of returnsToProcess){
+      const issueTx = pendingList.find(function(p){ return p.id === r.issueId; });
+      if(!issueTx){ showToast('Transaction not found', 'error'); return; }
+      if(r.qty > issueTx.pending){ showToast('Cannot return more than pending quantity (' + issueTx.pending + ') for ' + issueTx.itemName, 'error'); return; }
+    }
+
+    try{
+      for(const r of returnsToProcess){
+        const issueTx = transactions.find(function(t){ return t.id===r.issueId; });
+        const item = items.find(function(i){ return i.id===issueTx.itemId; });
+        if(item){
+          await fb.updateDoc(fb.doc(fb.db, COL_ITEMS, item.id), { issued: Math.max(0, item.issued - r.qty) });
+        }
+        await fb.addDoc(fb.collection(fb.db, COL_TRANSACTIONS), {
+          type:'return', refIssueId: issueTx.id, batchId: issueTx.batchId, eventName: issueTx.eventName||'',
+          customerName: issueTx.customerName, phone: issueTx.phone, date: todayStr(),
+          itemId: issueTx.itemId, itemName: issueTx.itemName, quantity: r.qty
+        });
+      }
+      showToast('Items returned successfully');
+    }catch(err){ showToast('Return failed: ' + err.message, 'error'); }
+  });
+}
+
+function bindDamageEvents(){
+  const sel = document.getElementById('damageCustomerSelect');
+  if(!sel) return;
+  sel.addEventListener('change', function(e){
+    renderDamageItemsArea(e.target.value);
+    bindDamageConfirmEvent();
+  });
+}
+
+function bindDamageConfirmEvent(){
+  const btn = document.getElementById('confirmDamageBtn');
+  if(!btn) return;
+  btn.addEventListener('click', async function(){
+    const qtyInputs = document.querySelectorAll('[data-damage-qty]');
+    const entries = [];
+    qtyInputs.forEach(function(inp){
+      const issueId = inp.dataset.damageQty;
+      const qty = parseInt(inp.value, 10) || 0;
+      const typeSelect = document.querySelector('[data-damage-type="' + issueId + '"]');
+      const type = typeSelect ? typeSelect.value : '';
+      if(qty > 0 && type){ entries.push({issueId:issueId, qty:qty, type:type}); }
+    });
+
+    if(entries.length === 0){ showToast('Please select a type and quantity for at least one item', 'error'); return; }
+
+    const pendingList = computePendingTransactions();
+    for(const en of entries){
+      const issueTx = pendingList.find(function(p){ return p.id === en.issueId; });
+      if(!issueTx){ showToast('Transaction not found', 'error'); return; }
+      if(en.qty > issueTx.pending){ showToast('Quantity exceeds pending amount (' + issueTx.pending + ') for ' + issueTx.itemName, 'error'); return; }
+    }
+
+    try{
+      for(const en of entries){
+        const issueTx = transactions.find(function(t){ return t.id===en.issueId; });
+        const item = items.find(function(i){ return i.id===issueTx.itemId; });
+        if(item){
+          const field = en.type === 'damage' ? 'damaged' : 'lost';
+          const updatedField = (item[field]||0) + en.qty;
+          const updatedIssued = Math.max(0, item.issued - en.qty);
+          const updateObj = {issued: updatedIssued};
+          updateObj[field] = updatedField;
+          await fb.updateDoc(fb.doc(fb.db, COL_ITEMS, item.id), updateObj);
+        }
+        await fb.addDoc(fb.collection(fb.db, COL_TRANSACTIONS), {
+          type: en.type, refIssueId: issueTx.id, batchId: issueTx.batchId, eventName: issueTx.eventName||'',
+          customerName: issueTx.customerName, phone: issueTx.phone, date: todayStr(),
+          itemId: issueTx.itemId, itemName: issueTx.itemName, quantity: en.qty
+        });
+      }
+      showToast('Damage / lost report recorded');
+    }catch(err){ showToast('Failed to record report: ' + err.message, 'error'); }
+  });
+}
+
+function bindCurrentOutEvents(){
+  document.getElementById('currentOutSearchInput').addEventListener('input', function(e){
+    currentOutSearch = e.target.value;
+    render();
+    setTimeout(function(){ const el=document.getElementById('currentOutSearchInput'); if(el){ el.focus(); el.selectionStart = el.selectionEnd = el.value.length; } },0);
+  });
+}
+
+function bindHistoryEvents(){
+  document.getElementById('historySearchInput').addEventListener('input', function(e){
+    historySearch = e.target.value;
+    render();
+    setTimeout(function(){ const el=document.getElementById('historySearchInput'); if(el){ el.focus(); el.selectionStart = el.selectionEnd = el.value.length; } },0);
+  });
+  document.getElementById('historyCustomerFilter').addEventListener('change', function(e){
+    historyCustomerFilter = e.target.value;
+    render();
+  });
+  document.getElementById('historyTypeFilter').addEventListener('change', function(e){
+    historyTypeFilter = e.target.value;
+    render();
+  });
+}
+
+function bindDataEvents(){
+  document.getElementById('exportInventoryBtn').addEventListener('click', function(){
+    const rows = items.map(function(i){
+      return {
+        Name:i.name, Category:i.category, TotalQuantity:i.quantity, Issued:i.issued,
+        Damaged:i.damaged||0, Lost:i.lost||0, Available: availableQty(i), Notes: i.notes||''
+      };
+    });
+    exportCSV('inventory_export.csv', rows);
+    showToast('Inventory exported');
+  });
+  document.getElementById('exportTransactionsBtn').addEventListener('click', function(){
+    const rows = transactions.map(function(t){
+      return {
+        Type:t.type, Event:t.eventName||'', Customer:t.customerName, Phone:t.phone||'', Item:t.itemName,
+        Quantity:t.quantity, Date:t.date
+      };
+    });
+    exportCSV('transactions_export.csv', rows);
+    showToast('Transactions exported');
+  });
+  document.getElementById('exportBookingsBtn').addEventListener('click', function(){
+    const rows = bookings.map(function(b){
+      return {
+        Event:b.eventName||'', Customer:b.customerName, Phone:b.phone, Date:b.date,
+        TotalAmount:b.totalAmount, Advance:b.advance, Due:b.due
+      };
+    });
+    exportCSV('bookings_export.csv', rows);
+    showToast('Bookings exported');
+  });
+  document.getElementById('exportJsonBtn').addEventListener('click', function(){
+    exportJSONBackup();
+    showToast('JSON backup downloaded');
+  });
+  document.getElementById('importJsonBtn').addEventListener('click', function(){
+    const fileInput = document.getElementById('importJsonInput');
+    const file = fileInput.files[0];
+    if(!file){ showToast('Please select a JSON file to import', 'error'); return; }
+    const reader = new FileReader();
+    reader.onload = function(e){
+      showConfirm('Importing will add the backup data into your current Firestore database. Continue?', function(){
+        importJSONBackup(e.target.result);
+      }, 'Confirm Import');
+    };
+    reader.readAsText(file);
+  });
+  document.getElementById('addCategoryBtn').addEventListener('click', async function(){
+    const input = document.getElementById('newCategoryInput');
+    const val = input.value.trim();
+    if(!val){ showToast('Please enter a category name', 'error'); return; }
+    if(categories.includes(val)){ showToast('Category already exists', 'error'); return; }
+    try{
+      await fb.addDoc(fb.collection(fb.db, COL_CATEGORIES), {name:val});
+      showToast('Category added');
+    }catch(err){ showToast('Failed to add category: ' + err.message, 'error'); }
+  });
+  document.querySelectorAll('[data-delete-category]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      const catName = btn.dataset.deleteCategory;
+      showConfirm('Delete category "' + escapeHtml(catName) + '"?', async function(){
+        try{
+          const snap = await fb.getDocs(fb.collection(fb.db, COL_CATEGORIES));
+          const docToDelete = snap.docs.find(function(d){ return d.data().name === catName; });
+          if(docToDelete){
+            await fb.deleteDoc(fb.doc(fb.db, COL_CATEGORIES, docToDelete.id));
+          }
+          showToast('Category deleted');
+        }catch(err){ showToast('Delete failed: ' + err.message, 'error'); }
+      }, 'Delete Category');
+    });
+  });
+  document.getElementById('resetAllBtn').addEventListener('click', function(){
+    showConfirm('This will permanently delete ALL data in Firestore including inventory, categories, transactions, and bookings. This action cannot be undone. Continue?', async function(){
+      try{
+        const collectionsToClear = [COL_ITEMS, COL_CATEGORIES, COL_TRANSACTIONS, COL_BOOKINGS];
+        for(const colName of collectionsToClear){
+          const snap = await fb.getDocs(fb.collection(fb.db, colName));
+          for(const d of snap.docs){
+            await fb.deleteDoc(fb.doc(fb.db, colName, d.id));
+          }
+        }
+        showToast('All Firestore data has been reset');
+      }catch(err){ showToast('Reset failed: ' + err.message, 'error'); }
+    }, 'Confirm Full Reset');
+  });
+}
+</script>
+</body>
+</html>
